@@ -24,7 +24,7 @@ spec:
         effect: "NoSchedule"
       containers:
       - name: test-ms-alpha
-        image: 616035352558.dkr.ecr.ap-southeast-1.amazonaws.com/members:alpha_5170
+        image: nginx
         ports:
         - containerPort: 3000
         resources:
