@@ -1,0 +1,134 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-ms-alpha
+  namespace: preprod
+  labels:
+    app: test-ms-alpha
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-ms-alpha
+  template:
+    metadata:
+      labels:
+        app: test-ms-alpha
+        serviceType: non-essential
+    spec:
+      serviceAccountName: eks-s3  # Moved here
+      tolerations:
+      - key: "serviceType"
+        operator: "Equal"
+        value: "non-essential"
+        effect: "NoSchedule"
+      containers:
+      - name: test-ms-alpha
+        image: 616035352558.dkr.ecr.ap-southeast-1.amazonaws.com/members:alpha_5170
+        ports:
+        - containerPort: 3000
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "450m"
+          limits:
+            memory: "1024Mi"
+            cpu: "900m"
+        env:
+        - name: HOST_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.hostIP
+        - name: K8S_POD_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.podIP
+        - name: K8S_POD_UID
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.uid
+        - name: OTEL_EXPORTER_OTLP_INSECURE
+          value: "true"
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: $(HOST_IP):4317
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: service.name=test-ms-alpha,service.version=v_alpha_5170,cube.environment=alpha,k8s.pod.ip=$(K8S_POD_IP),k8s.pod.uid=$(K8S_POD_UID)
+        - name: NEW_RELIC_DISTRIBUTED_TRACING_ENABLED
+          value: "true"
+        - name: DD_TRACE_SAMPLE_RATE
+          value: "1.0"
+        - name: DD_TRACE_DEBUG
+          value: "false"
+        - name: DD_VERSION
+          value: "valpha_BUILD_ID"
+        - name: DD_RUNTIME_METRICS_ENABLED
+          value: "true"
+        - name: DD_SERVICE
+          value: "test-ms-alpha"
+        - name: DD_TRACE_ENABLED
+          value: "true"
+        - name: DD_LOGS_INJECTION
+          value: "true"
+        - name: NODE_ENV
+          value: "alpha"
+        - name: DD_ENV
+          value: "alpha"
+        - name: DD_TAGS
+          value: "test-ms-alpha"
+        - name: DD_TRACE_ANALYTICS_ENABLED
+          value: "true"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: test-ms-alpha
+  namespace: preprod
+spec:
+  maxReplicas: 30
+  metrics:
+  - resource:
+      name: memory
+      target:
+        averageUtilization: 75
+        type: Utilization
+    type: Resource
+  - resource:
+      name: cpu
+      target:
+        averageUtilization: 75
+        type: Utilization
+    type: Resource
+  minReplicas: 1
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: test-ms-alpha
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-ms-alpha
+  namespace: preprod
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 3000
+  selector:
+    app: test-ms-alpha
+  type: NodePort
