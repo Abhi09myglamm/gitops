@@ -104,7 +104,7 @@ spec:
   - resource:
       name: memory
       target:
-        averageUtilization: 10
+        averageUtilization: 75
         type: Utilization
     type: Resource
   - resource:
